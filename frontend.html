@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Tutor Agent</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans p-6">
+  <div class="max-w-2xl mx-auto bg-white p-6 rounded-xl shadow">
+    <h1 class="text-2xl font-bold mb-4">🧠 AI Tutor Agent</h1>
+
+    <div id="chat" class="space-y-4 max-h-[60vh] overflow-y-auto mb-4 border p-4 rounded bg-gray-50 text-sm">
+      <!-- Messages will appear here -->
+    </div>
+
+    <form id="chat-form" class="flex gap-2">
+      <input
+        type="text"
+        id="user-input"
+        class="flex-1 border border-gray-300 rounded px-4 py-2"
+        placeholder="請輸入問題..."
+        required
+      />
+      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">送出</button>
+    </form>
+  </div>
+
+  <script>
+    const chat = document.getElementById("chat");
+    const form = document.getElementById("chat-form");
+    const input = document.getElementById("user-input");
+
+    let socket = new WebSocket("ws://localhost:8000/ws"); // 依照你的後端地址修改
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const msg = input.value.trim();
+      if (!msg) return;
+      addMessage("👤", msg);
+      socket.send(msg);
+      input.value = "";
+
+      // 顯示 AI typing 中
+      addMessage("🤖", "", true);
+    });
+
+    function addMessage(sender, text, isStreaming = false) {
+      const div = document.createElement("div");
+      div.className = "flex items-start gap-2";
+
+      const icon = document.createElement("div");
+      icon.textContent = sender;
+      icon.className = "font-bold";
+
+      const bubble = document.createElement("div");
+      bubble.className = "bg-gray-200 rounded px-3 py-2";
+      bubble.innerText = text;
+
+      div.appendChild(icon);
+      div.appendChild(bubble);
+      chat.appendChild(div);
+
+      if (isStreaming) {
+        bubble.dataset.streaming = "true";
+        bubble.dataset.content = "";
+      }
+
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    socket.onmessage = (event) => {
+      const last = [...chat.querySelectorAll("[data-streaming=true]")].pop();
+      if (!last) return;
+
+      if (event.data === "[end]") {
+        last.dataset.streaming = "false";
+        return;
+      }
+
+      last.dataset.content += event.data;
+      last.innerText = last.dataset.content;
+    };
+
+    socket.onopen = () => console.log("✅ WebSocket 連線成功");
+    socket.onclose = () => console.log("❌ WebSocket 已關閉");
+  </script>
+</body>
+</html>
+<script>
+    // 確保 WebSocket 連線在頁面加載時建立
+    window.addEventListener("load", () => {
+      if (!socket || socket.readyState === WebSocket.CLOSED) {
+        socket = new WebSocket("ws://localhost:8000/ws");
+      }
+    });
+  </script>
